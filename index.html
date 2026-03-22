@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON → 后日谈生成器</title>
+<style>
+  body {
+    font-family: sans-serif;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 100%;
+    margin: 0;
+    background-color: #2d2d2d;
+    color: #ffffff;
+  }
+  textarea {
+    width: 95%;
+    max-width: 800px;
+    height: 250px;
+    margin: 10px 0;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 14px;
+    box-sizing: border-box;
+    resize: vertical;
+    background-color: #3d3d3d;
+    color: #ffffff;
+    border: 1px solid #555;
+  }
+  textarea::placeholder {
+    color: #aaa;
+  }
+  pre {
+    width: 95%;
+    max-width: 800px;
+    padding: 10px;
+    background: #3d3d3d;
+    border: 1px solid #555;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin-top: 10px;
+    color: #ffffff;
+  }
+  .button-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    width: 95%;
+    max-width: 800px;
+  }
+  button {
+    padding: 8px 20px;
+    font-size: 14px;
+    margin-right: 10px;
+    cursor: pointer;
+    background-color: #4a4a4a;
+    color: #ffffff;
+    border: 1px solid #666;
+    border-radius: 4px;
+  }
+  button:hover {
+    background-color: #5a5a5a;
+  }
+  @media (max-width: 600px) {
+    textarea, pre {
+      height: 200px;
+      font-size: 13px;
+    }
+    button {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+  }
+  #copyTip {
+    font-size: 14px;
+    color: #4caf50;
+  }
+  fieldset {
+    border: 1px solid #555;
+    padding: 10px;
+    font-size: 12px;
+    color: #ddd;
+    width: 95%;
+    max-width: 800px;
+    box-sizing: border-box;
+    background-color: #3d3d3d;
+  }
+  legend {
+    color: #fff;
+  }
+  a {
+    color: #4caf50;
+  }
+  a:hover {
+    color: #6fbf6f;
+  }
+  h2 {
+    color: #ffffff;
+  }
+  footer {
+    color: #888;
+  }
+  footer a {
+    color: #888;
+  }
+  footer a:hover {
+    color: #aaa;
+  }
+</style>
+</head>
+
+<body>
+
+<h2>JSON → 后日谈生成器</h2>
+<fieldset style="
+    border: 1px solid #555; 
+    padding: 10px; 
+    font-size: 12px; 
+    color: #ddd;
+    width: 95%;
+    max-width: 800px;
+    box-sizing: border-box;
+    background-color: #3d3d3d;
+">
+    <legend>使用说明</legend>
+    * 生成的标题格式不一，部分需要手动校正<br>
+    * 一键转换任意角色的全部后日谈为半完成模板<br>
+    * 页中提示和个人条件作为可供参考的注释生成<br>
+    * <a href="https://wiki.biligame.com/sultansgame/index.php?title=%E7%94%A8%E6%88%B7:11880951/%E4%BB%AA%E5%BC%8F%E6%A8%A1%E6%9D%BF%E7%94%9F%E6%88%90%E5%99%A8" target="_blank" style="color:#4caf50;">使用教程</a><br>
+</fieldset>
+
+<textarea id="jsonInput" placeholder="在这里粘贴JSON"></textarea>
+
+<div class="button-group">
+  <button onclick="processJSON()">生成模板</button>
+  <button onclick="copyOutput()">复制结果</button>
+  <span id="copyTip"></span>
+</div>
+
+<pre id="output"></pre>
+
+<script>
+function copyOutput() {
+    const output = document.getElementById('output');
+    if(!output.textContent.trim()) return;
+    navigator.clipboard.writeText(output.textContent).then(() => {
+        const tip = document.getElementById('copyTip');
+        tip.textContent = '已复制到剪贴板！';
+        setTimeout(()=>{ tip.textContent = ''; }, 2000);
+    }, (err) => {
+        alert('复制失败：' + err);
+    });
+}
+
+function cleanTitle(title) {
+    // 如果标题末尾有一串连字符（超过1个），则去掉
+    // 但保留像 "-新增" 这样的标记（连字符后跟非连字符）
+    // 匹配模式：末尾的一串连字符（2个或以上），后面可能跟换行或结尾
+    title = title.replace(/-{2,}$/, '');
+    // 如果还有 "-" 后面跟非连字符，保留（如 "-新增"）
+    return title.trim();
+}
+
+function processJSON() {
+    let raw = document.getElementById('jsonInput').value;
+    
+    // 将所有“造反结局条件”替换为“造反条件”
+    raw = raw.replace(/造反结局条件/g, '造反条件');
+    
+    // 先按 "//---------------------------" (27个连字符) 分割
+    let results = [];
+    let sections = raw.split(/\/\/-{27}/);
+    
+    for (let section of sections) {
+        if (!section.trim()) continue;
+        
+        // 提取标题
+        let overture = '';
+        
+        // 获取第一行
+        let firstLine = section.split('\n')[0];
+        if (!firstLine) continue;
+        
+        // 检查是否有"结局"两字
+        let hasEnding = firstLine.match(/^结局/);
+        
+        if (hasEnding) {
+            // 如果有"结局"两字，取"结局"后面的文字部分
+            let titleMatch = firstLine.match(/^结局([^\n]+)/);
+            if (titleMatch) {
+                overture = titleMatch[1].trim();
+            }
+        } else {
+            // 如果没有"结局"两字，取第一行文字
+            overture = firstLine.trim();
+        }
+        
+        // 清理标题：去掉末尾的一串连字符（2个或以上）
+        overture = cleanTitle(overture);
+        
+        if (!overture) continue;
+        
+        // 提取这个section中的所有JSON对象
+        let objects = [];
+        let braceDepth = 0;
+        let startIdx = -1;
+        
+        for (let i = 0; i < section.length; i++) {
+            if (section[i] === '{') {
+                if (braceDepth === 0) startIdx = i;
+                braceDepth++;
+            } else if (section[i] === '}') {
+                braceDepth--;
+                if (braceDepth === 0 && startIdx !== -1) {
+                    let objStr = section.substring(startIdx, i + 1);
+                    objects.push(objStr);
+                    startIdx = -1;
+                }
+            }
+        }
+        
+        if (objects.length === 0) continue;
+        
+        // 解析每个对象
+        let parsedObjects = [];
+        let commonConditionComments = []; // 存储第一个对象的造反条件注释
+        
+        for (let idx = 0; idx < objects.length; idx++) {
+            let objStr = objects[idx];
+            // 清理JSON中的注释用于解析
+            let noComments = objStr.replace(/\/\/.*$/gm, '');
+            // 去掉多余逗号
+            let noTrailingCommas = noComments.replace(/,(\s*[\]}])/g, '$1');
+            
+            let obj;
+            try {
+                obj = JSON.parse(noTrailingCommas);
+            } catch(e) {
+                console.error('解析对象失败:', objStr, e);
+                continue;
+            }
+            
+            // 提取condition中的注释文本（从原始objStr中提取）
+            let originalObjStr = objStr;
+            
+            // 提取造反条件的注释文本（只对第一个对象提取）
+            let rebellionComments = [];
+            if (idx === 0) {
+                let rebellionMatch = originalObjStr.match(/\/\/-{8,}造反条件-{8,}([\s\S]*?)\/\/-{8,}个人条件-{8,}/);
+                if (rebellionMatch) {
+                    let rebellionSection = rebellionMatch[1];
+                    // 提取所有 //xxx 的注释
+                    let commentMatches = rebellionSection.matchAll(/\/\/([^\n]+)/g);
+                    for (let match of commentMatches) {
+                        let comment = match[1].trim();
+                        if (comment && !comment.includes('--------') && !comment.includes('条件')) {
+                            rebellionComments.push(comment);
+                        }
+                    }
+                }
+                commonConditionComments = rebellionComments;
+            }
+            
+            // 提取个人条件
+            let personalComments = [];
+            let personalMatch = originalObjStr.match(/\/\/-{8,}个人条件-{8,}([\s\S]*?)(?=\/\/-{8,}|$)/);
+            if (personalMatch) {
+                let personalSection = personalMatch[1];
+                // 提取条件键名（如 "have.2000055":1）
+                let conditionMatches = personalSection.matchAll(/("[^"]+"\s*:\s*\d+)/g);
+                for (let match of conditionMatches) {
+                    let cond = match[1].trim();
+                    personalComments.push(cond);
+                }
+            }
+            
+            // 处理result_text
+            let resultText = obj.result_text || "";
+            // 将 \n\n 替换为 {{间隔|高=8px}}
+            resultText = resultText.replace(/\n\n/g, '{{间隔|高=8px}}');
+            // 将单独的 \n 替换为 <br>（如果还有）
+            resultText = resultText.replace(/\n/g, '<br>');
+            
+            parsedObjects.push({
+                key: obj.key,
+                personalConditions: personalComments.join(' '),
+                resultText: resultText
+            });
+        }
+        
+        if (parsedObjects.length === 0) continue;
+        
+        // 构建输出模板
+        let output = `=== [[File:后日谈icon.png|50px]] [[${overture}]] ===\n`;
+        
+        // 公共结局条件
+        if (commonConditionComments.length > 0) {
+            output += `{{页中提示|结局条件|<!-- ${commonConditionComments.join('，')} -->}}\n`;
+        } else {
+            output += `{{页中提示|结局条件|<!-- -->}}\n`;
+        }
+        
+        output += `<section begin="${overture}" />\n`;
+        
+        // 生成每个分支
+        for (let idx = 0; idx < parsedObjects.length; idx++) {
+            let obj = parsedObjects[idx];
+            let branchNum = idx + 1;
+            output += `{{后日谈条目|分支${branchNum}\n`;
+            output += `|个人 = <!-- ${obj.personalConditions} -->\n`;
+            output += `|内容 = ${obj.resultText}\n`;
+            output += `}}\n`;
+        }
+        
+        output += `<section end="${overture}" />\n`;
+        output += `<br>\n`;
+        
+        results.push(output);
+    }
+    
+    if (results.length === 0) {
+        document.getElementById('output').textContent = '未找到符合格式的结局数据（需要包含 "//---------------------------" 的格式）';
+    } else {
+        document.getElementById('output').textContent = results.join('\n');
+    }
+}
+</script>
+
+<!-- 页脚 -->
+<footer style="text-align:center; padding:10px; font-size:12px; color:#888; font-style:italic; margin-top:20px;">
+    项目地址：<a href="https://github.com/laicwew/Json2AfterStory" target="_blank" style="color:#888;">https://github.com/laicwew/Json2AfterStory</a><br>
+</footer>
+
+</body>
+</html>
